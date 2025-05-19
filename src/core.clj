@@ -56,12 +56,8 @@
         ]
     ;; Deref the emojis so that they are guaranteed to appear in order.
     ;; But put a timeout of a few ms on there just in case they never deref, or take too long.
-    ;; (deref (m/create-reaction! conn (:channel-id @message) (:id @message) "1️⃣") 50 :timeout)
-    ;; (deref (m/create-reaction! conn (:channel-id @message) (:id @message) "2️⃣") 50 :timeout)
-    ;; (deref (m/create-reaction! conn (:channel-id @message) (:id @message) "3️⃣") 50 :timeout)
-
-    (dorun (map (fn [emoji](deref (m/create-reaction! conn (:channel-id @message) (:id @message) emoji) 50 :timeout))
-                '[️"1️⃣""2️⃣""3️⃣""4️⃣""5️⃣"]))
+    (run! (fn [emoji] (deref (m/create-reaction! conn (:channel-id @message) (:id @message) emoji) 100 :timeout))
+          '[️"1️⃣""2️⃣""3️⃣""4️⃣""5️⃣"])
     ))
 
 (defn -main
