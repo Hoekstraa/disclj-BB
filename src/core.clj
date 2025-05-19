@@ -32,6 +32,7 @@
            ;; Order matters here, as the router will go through this front to back.
            [routes/empty-mdn
             routes/empty-ns
+            routes/version
             routes/too-long
             routes/robot
             routes/poast-coad

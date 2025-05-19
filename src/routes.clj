@@ -21,6 +21,10 @@
   {:condition (fn [msg _] (< 70 (count msg)))
    :result (fn [msg _]  "Nuh uh, that request is too long.")})
 
+(def version
+  {:condition (fn [msg _] (= msg "version"))
+   :result (fn [msg _] (str "Bot version: " (get replies/project-version-info "version")))})
+
 (def robot
   {:condition (fn [msg _] (or (= msg "bleep bloop") (= msg "bloop bleep")))
    :result (fn [msg _] (s/join " " (-> msg (s/split #"\s") reverse)))})
