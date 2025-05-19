@@ -23,7 +23,8 @@
 
 (def version
   {:condition (fn [msg _] (= msg "version"))
-   :result (fn [msg _] (str "Bot version: " (get replies/project-version-info "version")))})
+   :result (fn [msg _] (str "Bot version: " (get replies/project-version-info "version")
+                            "\nLast Git commit: " (get replies/project-version-info "revision")))})
 
 (def robot
   {:condition (fn [msg _] (or (= msg "bleep bloop") (= msg "bloop bleep")))
