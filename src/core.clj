@@ -45,14 +45,24 @@
 
 (defn- event-enricher
   "Turns an event into a map with all relevant data."
-  [event message-ch n]
+  [event conn n]
   ;; Ensure bogus requests are ignored early.
   (when (< 70 (count (:content event))))
 
   (let [msg (-> event :content (string/replace #"(?i)^!(MDN|NS)\b" "") r/lcase-&-rm-ns)
         ;; Pass the event to the router
-        reply (router msg event)]
-    (m/create-message! message-ch (:channel-id event) :content reply)))
+        reply (router msg event)
+        message (m/create-message! conn (:channel-id event) :content reply)
+        ]
+    ;; Deref the emojis so that they are guaranteed to appear in order.
+    ;; But put a timeout of a few ms on there just in case they never deref, or take too long.
+    ;; (deref (m/create-reaction! conn (:channel-id @message) (:id @message) "1️⃣") 50 :timeout)
+    ;; (deref (m/create-reaction! conn (:channel-id @message) (:id @message) "2️⃣") 50 :timeout)
+    ;; (deref (m/create-reaction! conn (:channel-id @message) (:id @message) "3️⃣") 50 :timeout)
+
+    (dorun (map (fn [emoji](deref (m/create-reaction! conn (:channel-id @message) (:id @message) emoji) 50 :timeout))
+                '[️"1️⃣""2️⃣""3️⃣""4️⃣""5️⃣"]))
+    ))
 
 (defn -main
   "Start the server.
