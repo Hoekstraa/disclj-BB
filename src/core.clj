@@ -11,6 +11,9 @@
    [discljord.messaging   :as msg]
    [discljord.formatting :as fmt]))
 
+(def TEST
+  true)
+
 (def token
   "Discord bot token, used as ID and 'security measure' in one. Use your own!"
   (slurp "./data/discord_bot.key"))
@@ -96,12 +99,13 @@
 (def channel (connection/connect-bot! token events :intents #{}))
 
 
-(def greet
+(def greet-cmd
   {:name "hello"
 
    :description "Say hi to someone"
 
-   :options [{:type 6 ; The type of the option. In this case, 6 - user. See the link to the docs above for all types.
+   :options [{;; See this link for more info about the type: https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-type
+              :type 6
               :name "user"
               :description "The user to greet"}]
 
@@ -110,11 +114,34 @@
               [{:keys [id token] {{user-id :id} :user} :member {[{target-id :value}] :options} :data}]
               (msg/create-interaction-response! conn id token 4 :data {:content (str "Hello, " (fmt/mention-user (or target-id user-id)) " :smile:")}))})
 
-(defn register-commands
-  []
+(def ns-cmd
+  {:name "ns"
+
+   :description "Look up documentation of an NS API entry."
+
+   :options [{;; See this link for more info about the type: https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-type
+              :type 3
+              :name "query"
+              :description "What you want to look for in the NS API."}]
+
+   :handler (fn
+              [{:keys [id token] {{user-id :id} :user} :member {[{option :value}] :options} :data}]
+              (msg/create-interaction-response! conn id token 4 :data {:content (str "Hello, " (or option "") " :smile:")}))})
+
+(defn register-command!
+  "Register a single command."
+  [command]
   ;; Params: guild id (omit for global commands), command name, command description, optionally command options
-  @(msg/create-guild-application-command! conn app-id guild-id (greet :name) (greet :description) :options (greet :options))
-  ;;(msg/bulk-overwrite-guild-application-commands! conn app-id guild-id commands & {:as opts, :keys [:user-agent :audit-reason]})
+  (println @(msg/create-guild-application-command! conn app-id guild-id (command :name) (command :description) :options (command :options)))
+
+  (when (not TEST)
+    @(msg/create-global-application-command! conn app-id (command :name) (command :description) :options (command :options))))
+
+(defn register-commands!
+  []
+  (let [commands [ns-cmd greet-cmd]]
+    ;; We're not using msg/bulk-overwrite-guild-application-commands! here, due to the internals for making commands not being exposed
+    (run! register-command! commands))
   )
 
 (defn handle-command
@@ -125,7 +152,7 @@
 (defn -main
   "Register and handle commands."
   []
-  (register-commands)
+  (register-commands!)
 
   (async/go-loop []
     (when-let [interaction (async/<! events)]
