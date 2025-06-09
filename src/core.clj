@@ -9,7 +9,8 @@
    [clojure.core.async    :as async]
    [discljord.connections :as connection]
    [discljord.messaging   :as msg]
-   [discljord.formatting :as fmt]))
+   [discljord.formatting :as fmt]
+   [clojure.pprint :as pp]))
 
 (def TEST
   true)
@@ -125,8 +126,9 @@
               :description "What you want to look for in the NS API."}]
 
    :handler (fn
-              [{:keys [id token] {{user-id :id} :user} :member {[{option :value}] :options} :data}]
-              (msg/create-interaction-response! conn id token 4 :data {:content (str "Hello, " (or option "") " :smile:")}))})
+              [{:keys [id token] {cmd-options :options} :data}]
+              (msg/create-interaction-response! conn id token 4 :data {:content
+                                                                       (str "I haven't connected NS search yet, but here's the query: " (:value (first cmd-options)) )}))})
 
 (defn register-command!
   "Register a single command."
@@ -146,8 +148,22 @@
 
 (defn handle-command
   ;; `target-id` will be the user id of the user to greet (if set)
-  [{:keys [id token] {{user-id :id} :user} :member {[{target-id :value}] :options} :data}]
-  (msg/create-interaction-response! conn id token 4 :data {:content (str "Hello, " (fmt/mention-user (or target-id user-id)) " :smile:")}))
+  [interaction]
+
+  ;; For testing/debugging
+  (pp/pprint interaction)
+
+  ;; Destructure interaction for easy access
+  (let [{:keys [id token] {cmd-name :name cmd-options :options} :data} interaction]
+    (println cmd-name)
+    (println cmd-options)
+
+    (if (= "ns" cmd-name)
+      ((ns-cmd :handler) interaction)
+      ((greet-cmd :handler) interaction)
+      ;;(:name (first cmd-options))
+      )
+    (msg/create-interaction-response! conn id token 4 :data {:content (str "Hello, " (fmt/mention-user "zonoia") " :smile:")})))
 
 (defn -main
   "Register and handle commands."
