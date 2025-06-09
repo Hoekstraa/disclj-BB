@@ -64,71 +64,86 @@
 ;;   ;; Ensure bogus requests are ignored early.
 ;;   (when (< 70 (count (:content event))))
 
-;;   (let [msg (-> event :content (string/replace #"(?i)^!(MDN|NS)\b" "") r/lcase-&-rm-ns)
-;;         ;; Pass the event to the router
-;;         reply (router msg event)]
-;;     (m/create-message! message-ch (:channel-id event) :content reply)))
-
 ;; ;; Dev note: https://gist.github.com/chrischambers/fcbbb4d1e856fdab6fa173d713fa96e7
-
-;; (defn -main
-;;   "Start the server.
-;;    Note to Zoë and other REPLers, use: `(doto (Thread. -main) (.setDaemon true) (.start))`."
-;;   []
-;;   (letfn [(check-prefix [data] (re-find #"(?i)^!(MDN|NS)\b" (get data :content "")))]
-;;     (let [event-ch     (async/chan 100)
-;;           _conn_ch     (c/connect-bot! token event-ch :intents intents)
-;;           message-ch   (m/start-connection! token)]
-;;       (try
-;;         (loop [n 0]
-;;           (recur
-;;            (let [[type data] (async/<!! event-ch)
-;;                  msg?        (= :message-create type)
-;;                  notbot?     (-> data :author :bot not)
-;;                  for-me?     (check-prefix data)
-;;                  ok?         (and msg? notbot? for-me?)]
-;;              (prn data)
-;;              (if ok? (do (event-enricher data message-ch n) (inc n)) n))))
-
-;;         (finally
-;;           (m/stop-connection! message-ch)
-;;           (async/close!           event-ch))))))
 
 
 (def conn (msg/start-connection! token))
 (def events (async/chan 100 (comp (filter (comp #{:interaction-create} first)) (map second))))
 (def channel (connection/connect-bot! token events :intents #{}))
 
+(def command-option-types
+  "See this link for more info about the types:
+  https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-type"
+  {:sub-command 1
+   :sub-command-group 2
+   :string 3
+   :integer 4
+   :boolean 5
+   :user 6
+   :channel 7
+   :role 8
+   :mentionable 9
+   :number 10
+   :attachment 11
+   })
 
 (def greet-cmd
   {:name "hello"
 
    :description "Say hi to someone"
 
-   :options [{;; See this link for more info about the type: https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-type
-              :type 6
+   :options [{:type (command-option-types :user)
               :name "user"
               :description "The user to greet"}]
 
    :handler (fn
               ;; `target-id` will be the user id of the user to greet (if set)
               [{:keys [id token] {{user-id :id} :user} :member {[{target-id :value}] :options} :data}]
-              (msg/create-interaction-response! conn id token 4 :data {:content (str "Hello, " (fmt/mention-user (or target-id user-id)) " :smile:")}))})
+              (msg/create-interaction-response! conn id token 4 :data
+                                                {:content (str "Hello, " (fmt/mention-user (or target-id user-id)) " :smile:")}))})
 
 (def ns-cmd
   {:name "ns"
 
    :description "Look up documentation of an NS API entry."
 
-   :options [{;; See this link for more info about the type: https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-type
-              :type 3
+   :options [{:type (command-option-types :string)
               :name "query"
-              :description "What you want to look for in the NS API."}]
+              :description "What you want to look for in the NS API."
+              :required true
+              :max_length 70}]
 
    :handler (fn
               [{:keys [id token] {cmd-options :options} :data}]
-              (msg/create-interaction-response! conn id token 4 :data {:content
-                                                                       (str "I haven't connected NS search yet, but here's the query: " (:value (first cmd-options)) )}))})
+              (msg/create-interaction-response! conn id token 4 :data
+                                                {:content
+                                                 "hello"
+                                                 ;;(r/signature-decorator (:value (first cmd-options)) nil (fn [query _] r/fuzzy-search true query r/ns-replies))
+                                                 }))})
+
+
+(def mdn-cmd
+  {:name "mdn"
+
+   :description "Look up documentation of an MDN JS API entry."
+
+   :options [{:type (command-option-types :string)
+              :name "query"
+              :description "What you want to look for in the MDN API."
+              :required true
+              :max_length 70}]
+
+   :handler (fn
+              ;; TODO FIXME
+              ;; edit original interaction response
+              [{:keys [id token] {cmd-options :options} :data}]
+              ;;(println @(msg/create-interaction-response! conn id token 1))
+              (println "MDN!")
+              ;;(Thread/sleep 5000)
+              (println @(msg/create-interaction-response! conn id token 4 :data
+                                                          {:content
+                                                           ;;"hello"
+                                                           (r/fuzzy-search true (:value (first cmd-options)) r/mdn-replies)})))})
 
 (defn register-command!
   "Register a single command."
@@ -139,16 +154,9 @@
   (when (not TEST)
     @(msg/create-global-application-command! conn app-id (command :name) (command :description) :options (command :options))))
 
-(defn register-commands!
-  []
-  (let [commands [ns-cmd greet-cmd]]
-    ;; We're not using msg/bulk-overwrite-guild-application-commands! here, due to the internals for making commands not being exposed
-    (run! register-command! commands))
-  )
-
 (defn handle-command
   ;; `target-id` will be the user id of the user to greet (if set)
-  [interaction]
+  [commands interaction]
 
   ;; For testing/debugging
   (pp/pprint interaction)
@@ -158,21 +166,25 @@
     (println cmd-name)
     (println cmd-options)
 
-    (if (= "ns" cmd-name)
-      ((ns-cmd :handler) interaction)
-      ((greet-cmd :handler) interaction)
-      ;;(:name (first cmd-options))
-      )
-    (msg/create-interaction-response! conn id token 4 :data {:content (str "Hello, " (fmt/mention-user "zonoia") " :smile:")})))
+    ;; (cond
+    ;;   (= "ns" cmd-name) ((ns-cmd :handler) interaction)
+    ;;   (= "mdn" cmd-name) ((mdn-cmd :handler) interaction)
+    ;;   (= "greet" cmd-name) ((greet-cmd :handler) interaction)
+    ;; :else "Oops! This isn't supposed to happen. Please try again."))
+
+    ((mdn-cmd :handler) interaction)))
+
+(def commands
+  [ns-cmd greet-cmd mdn-cmd])
 
 (defn -main
   "Register and handle commands."
   []
-  (register-commands!)
+  (run! register-command! commands)
 
   (async/go-loop []
     (when-let [interaction (async/<! events)]
       ;; See example interaction: https://discord.com/developers/docs/interactions/application-commands#slash-commands-example-interaction
-      (handle-command interaction)
+      (handle-command commands interaction)
       (recur)))
   )
