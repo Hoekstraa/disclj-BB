@@ -137,22 +137,54 @@
               ;; TODO FIXME
               ;; edit original interaction response
               [{:keys [id token] {cmd-options :options} :data}]
-              ;;(println @(msg/create-interaction-response! conn id token 1))
-              (println "MDN!")
+              ;;(println @(msg/create-interaction-response! conn id token 6 :data {:content "x"}))
+              ;;(println "MDN!")
               ;;(Thread/sleep 5000)
+              ;;(println @(msg/create-followup-message! conn id token :data {:content "hello"} ))
+
               (println @(msg/create-interaction-response! conn id token 4 :data
-                                                          {:content
-                                                           ;;"hello"
-                                                           (r/fuzzy-search true (:value (first cmd-options)) r/mdn-replies)})))})
+                                                          ;; {:content
+                                                          ;;  ;;"hello"
+                                                          ;;  (r/fuzzy-search true (:value (first cmd-options)) r/mdn-replies)}
+                                                          {:flags 32768
+                                                           :components
+                                                           [{:type 10
+                                                             :content (r/fuzzy-search true (:value (first cmd-options)) r/mdn-replies)}
+                                                            {:type 1
+                                                             :components [{:type 2
+                                                                           :label "1"
+                                                                           :style 1
+                                                                           :custom_id "button_one"}
+                                                                          {:type 2
+                                                                           :label "2"
+                                                                           :style 1
+                                                                           :custom_id "button_two"}
+                                                                          {:type 2
+                                                                           :label "3"
+                                                                           :style 1
+                                                                           :custom_id "button_three"}]}
+                                                            ;; {:type 3
+                                                            ;;  :custom_id "string_select"
+                                                            ;;  :placeholder "Favourite bug?"
+                                                            ;;  :options [{:label "Butterfly"
+                                                            ;;             :value "butterfly"
+                                                            ;;             :emoji {:name "🦋"}}
+                                                            ;;            {:label "Caterpillar"
+                                                            ;;             :value "caterpillar"
+                                                            ;;             :emoji {:name "🐛"}}]}
 
-(defn register-command!
-  "Register a single command."
-  [command]
-  ;; Params: guild id (omit for global commands), command name, command description, optionally command options
-  (println @(msg/create-guild-application-command! conn app-id guild-id (command :name) (command :description) :options (command :options)))
+                                                            ]
+                                                           }
+                                                          )))})
 
-  (when (not TEST)
-    @(msg/create-global-application-command! conn app-id (command :name) (command :description) :options (command :options))))
+                                                          (defn register-command!
+                                                            "Register a single command."
+                                                            [command]
+                                                            ;; Params: guild id (omit for global commands), command name, command description, optionally command options
+                                                            (println @(msg/create-guild-application-command! conn app-id guild-id (command :name) (command :description) :options (command :options)))
+
+                                                            (when (not TEST)
+                                                              @(msg/create-global-application-command! conn app-id (command :name) (command :description) :options (command :options))))
 
 (defn handle-command
   ;; `target-id` will be the user id of the user to greet (if set)
